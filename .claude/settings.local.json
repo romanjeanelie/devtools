@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(npm install:*)",
+      "Bash(npm audit:*)",
+      "Bash(npx vite:*)",
+      "Bash(npm list:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(find /Users/romanjean-elie/Documents/Développement/Projets/Scripts-gui/scripts-gui -type f \\\\\\(-name *.md -o -name README* \\\\\\) ! -path */node_modules/*)"
+    ]
+  }
+}

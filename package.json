@@ -1,0 +1,20 @@
+{
+  "name": "scripts-gui",
+  "version": "1.0.0",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
+    "dev": "concurrently -n backend,vite,electron -c cyan,green,magenta \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:backend":  "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:electron": "wait-on http://localhost:5173 && NODE_ENV=development electron .",
+    "build": "npm run build --prefix frontend",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^41.0.3",
+    "wait-on": "^9.0.4"
+  }
+}

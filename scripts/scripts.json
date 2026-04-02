@@ -1,0 +1,132 @@
+[
+  {
+    "name": "Image Sequence Opti",
+    "path": "./scripts/image_seq_opti.sh",
+    "description": "Resize and convert an image sequence folder → .tar (desktop + mobile)",
+    "inputType": "folder",
+    "params": [
+      { "name": "quality",   "label": "Quality",       "type": "slider",        "default": 85, "min": 1, "max": 100, "summary": true },
+      { "name": "outputDir", "label": "Output folder", "type": "folder-picker", "default": "", "placeholder": "Same as input folder" },
+      {
+        "name": "_cols", "type": "column-group", "cols": 2,
+        "params": [
+          {
+            "name": "exportDesktop", "label": "Desktop", "type": "toggle-group", "default": true,
+            "params": [
+              { "name": "desktopWidth", "label": "Max width", "type": "preset-or-custom", "default": 1920, "presets": [1280, 1920, 2560], "min": 320, "max": 7680, "summary": true, "suffix": "px" }
+            ]
+          },
+          {
+            "name": "exportMobile", "label": "Mobile", "type": "toggle-group", "default": true,
+            "params": [
+              { "name": "mobileWidth", "label": "Max width", "type": "preset-or-custom", "default": 750, "presets": [375, 750, 1080], "min": 160, "max": 2560, "summary": true, "suffix": "px" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Video → Image Sequence",
+    "path": "./scripts/video_to_png.sh",
+    "description": "Extract frames from a video file using ffmpeg (PNG, JPG, WebP…)",
+    "params": [
+      {
+        "name": "_row1",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { "name": "fps",    "label": "FPS",    "type": "preset-or-custom", "default": 24,    "presets": [12, 24, 30, 60], "min": 1, "max": 240, "summary": true, "suffix": "fps", "limitBy": "fps" },
+          { "name": "format", "label": "Format", "type": "button-group",     "default": "png", "options": ["png", "jpg", "bmp", "webp"], "summary": true }
+        ]
+      },
+      {
+        "name": "_row2",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { "name": "desktopWidth", "label": "Desktop Width", "type": "preset-or-custom", "default": 1920, "presets": [1280, 1920, 2560], "min": 320, "max": 7680, "summary": true, "suffix": "px", "limitBy": "width" },
+          { "name": "mobileWidth",  "label": "Mobile Width",  "type": "preset-or-custom", "default": 750,  "presets": [375, 750, 1080],   "min": 160, "max": 2560, "summary": true, "suffix": "px" }
+        ]
+      },
+      {
+        "name": "chromaKey", "label": "Transparency", "type": "toggle-group", "default": false,
+        "params": [
+          { "name": "chromaColor", "label": "Color",      "type": "select", "default": "green", "options": ["black", "white", "green"] },
+          { "name": "similarity",  "label": "Similarity", "type": "slider", "default": 15, "min": 1, "max": 100 },
+          { "name": "blend",       "label": "Blend",      "type": "slider", "default": 5,  "min": 0, "max": 50  }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Video → Web",
+    "path": "./scripts/video_web.sh",
+    "description": "Compress video for web (H.264/VP9) + poster frame WebP",
+    "params": [
+      {
+        "name": "_row1",
+        "type": "row-group",
+        "params": [
+          { "name": "format",   "label": "Format",    "type": "button-group",     "default": "mp4",  "options": ["mp4", "webm", "both"], "summary": true },
+          { "name": "maxWidth", "label": "Max Width", "type": "preset-or-custom", "default": 1920,   "presets": [1280, 1920, 2560],      "min": 320, "max": 7680, "summary": true, "suffix": "px", "limitBy": "width" },
+          { "name": "quality",  "label": "Quality",   "type": "slider",           "default": 75,     "min": 1, "max": 100, "summary": true }
+        ]
+      },
+      { "name": "stripAudio", "label": "Strip audio", "type": "toggle-group", "default": false, "params": [] }
+    ]
+  },
+  {
+    "name": "SVG Optimize",
+    "path": "./scripts/svg_optimize.sh",
+    "description": "Optimize SVG files with svgo — single file or folder",
+    "params": [
+      { "name": "precision", "label": "Precision", "type": "slider", "default": 3, "min": 0, "max": 8, "summary": true },
+      {
+        "name": "_row_svg",
+        "type": "row-group",
+        "params": [
+          { "name": "removeComments",  "label": "Remove comments",  "type": "toggle-group", "default": true,  "params": [] },
+          { "name": "removeMetadata",  "label": "Remove metadata",  "type": "toggle-group", "default": true,  "params": [] },
+          { "name": "cleanupIds",      "label": "Clean IDs",        "type": "toggle-group", "default": true,  "params": [] }
+        ]
+      },
+      {
+        "name": "_row_svg2",
+        "type": "row-group",
+        "params": [
+          { "name": "mergePaths",   "label": "Merge paths",   "type": "toggle-group", "default": true,  "params": [] },
+          { "name": "inlineStyles", "label": "Inline styles", "type": "toggle-group", "default": false, "params": [] },
+          { "name": "prettyPrint",  "label": "Pretty print",  "type": "toggle-group", "default": false, "params": [] }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Favicon Pack",
+    "path": "./scripts/favicon_pack.sh",
+    "description": "Generate all favicon sizes from PNG or SVG (ico, apple-touch, android…)",
+    "params": [
+      { "name": "manifest", "label": "Generate site.webmanifest", "type": "toggle-group", "default": false, "params": [] }
+    ]
+  },
+  {
+    "name": "Font Subset",
+    "path": "./scripts/font_subset.sh",
+    "description": "Subset a font to keep only needed glyphs (pyftsubset)",
+    "params": [
+      { "name": "format", "label": "Format", "type": "button-group", "default": "woff2", "options": ["ttf", "woff", "woff2"], "summary": true },
+      { "name": "chars",  "label": "Characters", "type": "char-picker", "default": "" }
+    ]
+  },
+  {
+    "name": "Images",
+    "path": "./scripts/images.sh",
+    "description": "Optimize PNG/JPG images for web — convert to WebP, resize, log + stats sur le Bureau",
+    "params": [
+      { "name": "maxWidth", "label": "Max Width",    "type": "select",  "default": "1920", "options": ["1280", "1920", "2560"] },
+      { "name": "quality",  "label": "Quality",      "type": "slider",  "default": 80,    "min": 1,  "max": 100 },
+      { "name": "alphaQ",   "label": "Alpha Quality","type": "slider",  "default": 90,    "min": 1,  "max": 100 }
+    ]
+  }
+]
