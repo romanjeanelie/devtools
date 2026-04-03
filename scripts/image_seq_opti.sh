@@ -5,6 +5,7 @@ set -euo pipefail
 INPUT=""
 OUTPUT_DIR=""
 QUALITY=85
+ALPHA_Q=95
 EXPORT_DESKTOP="true"
 EXPORT_MOBILE="true"
 DESKTOP_WIDTH=1920
@@ -15,6 +16,7 @@ for arg in "$@"; do
     --input=*)         INPUT="${arg#*=}" ;;
     --outputDir=*)     OUTPUT_DIR="${arg#*=}" ;;
     --quality=*)       QUALITY="${arg#*=}" ;;
+    --alphaQ=*)        ALPHA_Q="${arg#*=}" ;;
     --exportDesktop=*) EXPORT_DESKTOP="${arg#*=}" ;;
     --exportMobile=*)  EXPORT_MOBILE="${arg#*=}" ;;
     --desktopWidth=*)  DESKTOP_WIDTH="${arg#*=}" ;;
@@ -109,13 +111,13 @@ for img in "${IMAGES[@]}"; do
   echo "[${INDEX}/${TOTAL}] $(basename "$img") → $out_name"
 
   if [ "$EXPORT_DESKTOP" = "true" ]; then
-    cwebp -q "$QUALITY" -alpha_q 95 \
+    cwebp -q "$QUALITY" -alpha_q "$ALPHA_Q" \
       -resize "$DESKTOP_WIDTH" 0 \
       "$img" -o "${DESKTOP_TMP}/${out_name}" 2>/dev/null
   fi
 
   if [ "$EXPORT_MOBILE" = "true" ]; then
-    cwebp -q "$QUALITY" -alpha_q 95 \
+    cwebp -q "$QUALITY" -alpha_q "$ALPHA_Q" \
       -resize "$MOBILE_WIDTH" 0 \
       "$img" -o "${MOBILE_TMP}/${out_name}" 2>/dev/null
   fi

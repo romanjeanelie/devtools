@@ -5,7 +5,8 @@
     "description": "Resize and convert an image sequence folder → .tar (desktop + mobile)",
     "inputType": "folder",
     "params": [
-      { "name": "quality",   "label": "Quality",       "type": "slider",        "default": 85, "min": 1, "max": 100, "summary": true },
+      { "name": "quality",   "label": "Quality (RGB)", "type": "slider",        "default": 85, "min": 1, "max": 100, "summary": true },
+      { "name": "alphaQ",   "label": "Alpha Quality", "type": "slider",        "default": 95, "min": 0, "max": 100 },
       { "name": "outputDir", "label": "Output folder", "type": "folder-picker", "default": "", "placeholder": "Same as input folder" },
       {
         "name": "_cols", "type": "column-group", "cols": 2,
