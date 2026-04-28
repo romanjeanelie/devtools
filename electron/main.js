@@ -2,6 +2,7 @@ const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const { spawn }  = require('child_process');
 const { connect } = require('net');
 const path = require('path');
+const fs = require('fs').promises;
 
 const DEV          = process.env.NODE_ENV === 'development';
 const FRONTEND_URL = 'http://localhost:5173';
@@ -104,4 +105,13 @@ ipcMain.handle('open-folder-dialog', async () => {
     properties: ['openDirectory', 'createDirectory'],
   });
   return canceled ? null : filePaths[0];
+});
+
+ipcMain.handle('read-file', async (event, filePath) => {
+  return await fs.readFile(filePath);
+});
+
+ipcMain.handle('get-file-stat', async (event, filePath) => {
+  const stats = await fs.stat(filePath);
+  return { size: stats.size, sizeKb: (stats.size / 1024).toFixed(1) };
 });

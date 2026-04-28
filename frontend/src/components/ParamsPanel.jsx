@@ -1,12 +1,12 @@
-import { Label } from '@/components/ui/label';
+import { CharPicker } from '@/components/CharPicker';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { FolderOpen } from 'lucide-react';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { CharPicker } from '@/components/CharPicker';
 
 function renderControl(param, currentValue, onChange, meta, glyphs) {
   if (param.type === 'slider') {
@@ -16,6 +16,8 @@ function renderControl(param, currentValue, onChange, meta, glyphs) {
         min={param.min ?? 0}
         max={param.max ?? 100}
         step={1}
+        steps={param.steps}
+        stepLabels={param.stepLabels}
         value={[Number(currentValue || param.default)]}
         onValueChange={([v]) => onChange(param.name, v)}
       />
@@ -183,10 +185,12 @@ export function ParamsPanel({ params = [], values, onChange, meta, glyphs }) {
 
         if (param.type === 'row-group') {
           const colCount = param.cols ?? param.params?.length ?? 3;
+          const hasStepLabels = param.params?.some((c) => c.type === 'slider' && c.stepLabels?.length);
           return (
-            <div key={param.name} className={`grid grid-cols-${colCount} gap-3`}>
+            <div key={param.name} className={`grid grid-cols-${colCount} gap-3 items-end`}>
               {param.params?.map((child) => {
                 const childValue = String(values[child.name] ?? child.default ?? '');
+                const needsSpacer = hasStepLabels && child.type === 'slider' && !child.stepLabels?.length;
                 return (
                   <div key={child.name} className="space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -195,6 +199,7 @@ export function ParamsPanel({ params = [], values, onChange, meta, glyphs }) {
                         <span className="text-[11px] font-mono text-foreground tabular-nums">{childValue}</span>
                       )}
                     </div>
+                    {needsSpacer && <div className="h-9" />}
                     {renderControl(child, childValue, onChange, meta, glyphs)}
                   </div>
                 );

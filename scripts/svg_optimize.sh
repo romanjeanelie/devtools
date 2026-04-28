@@ -45,22 +45,22 @@ OVERRIDES=""
 OVERRIDES="${OVERRIDES%, }"  # strip trailing comma+space
 
 JS2SVG=""
-[ "$PRETTY_PRINT" = "true" ] && JS2SVG='"js2svg": { "pretty": true, "indent": 2 },'
+[ "$PRETTY_PRINT" = "true" ] && JS2SVG='js2svg: { pretty: true, indent: 2 },'
 
-CONFIG_FILE=$(mktemp /tmp/svgo-config-XXXX.json)
+CONFIG_FILE=$(mktemp /tmp/svgo-config-XXXX.mjs)
 cat > "$CONFIG_FILE" <<EOF
-{
+export default {
   ${JS2SVG}
-  "plugins": [
+  plugins: [
     {
-      "name": "preset-default",
-      "params": {
-        "floatPrecision": ${PRECISION},
-        "overrides": { ${OVERRIDES} }
+      name: "preset-default",
+      params: {
+        floatPrecision: ${PRECISION},
+        overrides: { ${OVERRIDES} }
       }
     }
   ]
-}
+};
 EOF
 
 echo "svgo $(svgo --version 2>/dev/null || echo '')"

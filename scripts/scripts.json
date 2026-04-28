@@ -1,6 +1,67 @@
 [
   {
-    "name": "Image Sequence Opti",
+    "type": "section",
+    "title": "Image Sequences"
+  },
+  {
+    "name": "Image Sequence → FSV",
+    "path": "./scripts/image_seq_to_fsv.sh",
+    "description": "Image sequence folder → .fsv (Fast Scrubbing Video with alpha, via @plutotcool/fsv)",
+    "inputType": "folder",
+    "params": [
+      { "name": "outputDir", "label": "Output folder", "type": "folder-picker", "default": "", "placeholder": "Same as input folder" },
+      {
+        "name": "_row1",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { 
+            "name": "quality", 
+            "label": "Quality (CRF)", 
+            "type": "slider", 
+            "default": 23, 
+            "min": 0, 
+            "max": 51, 
+            "summary": true,
+            "steps": [0, 18, 28, 51],
+            "stepLabels": ["Lossless", "Visually lossless", "Medium", "Worst"]
+          },
+          { "name": "gop", "label": "GOP (keyframe interval)", "type": "slider", "default": 5, "min": 1, "max": 30, "summary": true }
+        ]
+      },
+      { "name": "fps", "label": "FPS", "type": "preset-or-custom", "default": 30, "presets": [24, 30, 60], "min": 1, "max": 240, "summary": true, "suffix": "fps" },
+      {
+        "name": "_cols", "type": "column-group", "cols": 2,
+        "params": [
+          {
+            "name": "exportDesktop", "label": "Desktop (h265 + h264)", "type": "toggle-group", "default": true,
+            "params": [
+              { "name": "desktopWidth", "label": "Max width", "type": "preset-or-custom", "default": 1920, "presets": [1280, 1920, 2560], "min": 320, "max": 7680, "summary": true, "suffix": "px" }
+            ]
+          },
+          {
+            "name": "exportMobile", "label": "Mobile (h264)", "type": "toggle-group", "default": false,
+            "params": [
+              { "name": "mobileWidth", "label": "Max width", "type": "preset-or-custom", "default": 750, "presets": [375, 750, 1080], "min": 160, "max": 2560, "summary": true, "suffix": "px" }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "_cols2", "type": "column-group", "cols": 2,
+        "params": [
+          {
+            "name": "alpha", "label": "Alpha channel", "type": "toggle-group", "default": true, "params": []
+          },
+          {
+            "name": "debug", "label": "Debug log", "type": "toggle-group", "default": false, "params": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Image Sequence → Web",
     "path": "./scripts/image_seq_opti.sh",
     "description": "Resize and convert an image sequence folder → .tar (desktop + mobile)",
     "inputType": "folder",
@@ -26,6 +87,47 @@
         ]
       }
     ]
+  },
+  {
+    "name": "Image Sequence → Video Mask",
+    "path": "./scripts/image_seq_to_video_mask.sh",
+    "description": "Image sequence folder → MP4 with stacked RGB + alpha mask",
+    "inputType": "folder",
+    "hidden": true,
+    "params": [
+      {
+        "name": "_row1",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { "name": "fps",     "label": "FPS",     "type": "preset-or-custom", "default": 30, "presets": [24, 30, 60], "min": 1, "max": 240, "summary": true, "suffix": "fps" },
+          { "name": "quality", "label": "Quality", "type": "slider",           "default": 85, "min": 1, "max": 100, "summary": true }
+        ]
+      },
+      {
+        "name": "_row_af",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { "name": "afMaxWidth", "label": "AF Max Width", "type": "preset-or-custom", "default": 1920, "presets": [1080, 1440, 1920], "min": 320, "max": 7680, "summary": true, "suffix": "px" },
+          { "name": "afCodec",    "label": "AF Codec",     "type": "button-group",     "default": "h265", "options": ["h264", "h265"], "summary": true }
+        ]
+      },
+      {
+        "name": "_row_af2",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { "name": "afGop", "label": "AF GOP", "type": "number", "default": 5, "min": 1, "max": 250 },
+          { "name": "afCrf", "label": "AF CRF", "type": "number", "default": 28, "min": 1, "max": 50 }
+        ]
+      },
+      { "name": "outputDir", "label": "Output folder", "type": "folder-picker", "default": "", "placeholder": "Same as input folder" }
+    ]
+  },
+  {
+    "type": "section",
+    "title": "Videos"
   },
   {
     "name": "Video → Image Sequence",
@@ -76,6 +178,10 @@
       },
       { "name": "stripAudio", "label": "Strip audio", "type": "toggle-group", "default": false, "params": [] }
     ]
+  },
+  {
+    "type": "section",
+    "title": "Others"
   },
   {
     "name": "SVG Optimize",

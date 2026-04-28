@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { ScriptList } from '@/components/ScriptList';
 import { FileDropZone } from '@/components/FileDropZone';
-import { ParamsPanel } from '@/components/ParamsPanel';
+import { FsvInfo } from '@/components/FsvInfo';
 import { LogConsole, LogOutput } from '@/components/LogConsole';
+import { ParamsPanel } from '@/components/ParamsPanel';
 import { ScriptEditor } from '@/components/ScriptEditor';
-import { Button } from '@/components/ui/button';
+import { ScriptList } from '@/components/ScriptList';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Play, Square, AlertCircle, Terminal, Code2, X } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { AlertCircle, Code2, Play, Square, Terminal, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 const BACKEND     = 'http://localhost:3001';
 const WS_URL      = 'ws://localhost:3001';
@@ -45,6 +46,7 @@ function saveParams(scriptPath, params) {
 export default function App() {
   const [scripts, setScripts] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [showFsvInfo, setShowFsvInfo] = useState(false);
   const [inputPath, setInputPath] = useState('');
   const [videoMeta, setVideoMeta] = useState(null);
   const [fontGlyphs, setFontGlyphs] = useState(null);
@@ -58,6 +60,12 @@ export default function App() {
   const [consoleModal, setConsoleModal] = useState(false);
   const [consoleHeight, setConsoleHeight] = useState(208); // px
   const [showConsole, setShowConsole]     = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = parseInt(localStorage.getItem('scripts-gui-sidebar-width'), 10);
+    return Number.isFinite(saved) && saved >= 160 && saved <= 600 ? saved : 224;
+  });
+  const sidebarWidthRef = useRef(sidebarWidth);
+  useEffect(() => { sidebarWidthRef.current = sidebarWidth; }, [sidebarWidth]);
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
@@ -135,6 +143,7 @@ export default function App() {
   // ── Select script ──────────────────────────────────────────────────────────
   function handleSelectScript(script) {
     setSelected(script);
+    setShowFsvInfo(false);
     setEditorPanel(false);
     // Restore saved params for this script
     const saved = loadSavedParams()[script.path] || {};
@@ -234,13 +243,42 @@ export default function App() {
       {/* Body: sidebar + right column (main + console) */}
       <div className="flex min-h-0 flex-1">
 
-        {/* ── Left: script list — full height */}
-        <aside className="w-56 shrink-0 border-r border-border flex flex-col">
+        {/* ── Left: script list — full height (resizable) */}
+        <aside
+          className="shrink-0 border-r border-border flex flex-col relative"
+          style={{ width: sidebarWidth }}
+        >
           <ScriptList
             scripts={scripts}
             selected={selected}
             onSelect={handleSelectScript}
             onEdit={(script) => { handleSelectScript(script); setEditorPanel(true); }}
+            onFsvInfo={() => { setShowFsvInfo(true); setSelected(null); setEditorPanel(false); }}
+            showFsvInfo={showFsvInfo}
+          />
+          {/* Drag handle */}
+          <div
+            className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors z-10"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              const onMove = (ev) => {
+                const next = Math.min(600, Math.max(160, startWidth + (ev.clientX - startX)));
+                setSidebarWidth(next);
+              };
+              const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                try { localStorage.setItem('scripts-gui-sidebar-width', String(sidebarWidthRef.current)); } catch {}
+              };
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+              document.addEventListener('mousemove', onMove);
+              document.addEventListener('mouseup', onUp);
+            }}
           />
         </aside>
 
@@ -258,13 +296,15 @@ export default function App() {
                   </div>
                 )}
 
-                {!selected && (
+                {showFsvInfo && <FsvInfo />}
+
+                {!selected && !showFsvInfo && (
                   <div className="text-sm text-muted-foreground text-center py-4">
                     Select a script from the left panel
                   </div>
                 )}
 
-                {selected && (
+                {selected && !showFsvInfo && (
                   <>
                     <div>
                       <div className="flex items-center justify-between mb-2">
