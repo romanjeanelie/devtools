@@ -32,10 +32,10 @@ echo "Output: $OUT_DIR"
 echo ""
 
 # ── SVG → PNG (512px source) ──────────────────────────────────────────────────
-EXT="${INPUT##*.}"
+EXT="$(printf '%s' "${INPUT##*.}" | tr '[:upper:]' '[:lower:]')"
 SOURCE_PNG="/tmp/favicon_source_$$.png"
 
-if [[ "${EXT,,}" == "svg" ]]; then
+if [[ "$EXT" == "svg" ]]; then
   echo "▶  Converting SVG → PNG (512px)…"
   if command -v rsvg-convert &>/dev/null; then
     rsvg-convert -w 512 -h 512 "$INPUT" -o "$SOURCE_PNG"
@@ -47,6 +47,8 @@ if [[ "${EXT,,}" == "svg" ]]; then
     mv "/tmp/$(basename "$INPUT").png" "$SOURCE_PNG"
   fi
   echo "   ✓ Converted"
+  cp "$INPUT" "$OUT_DIR/favicon.svg"
+  echo "   ✓ favicon.svg"
 else
   cp "$INPUT" "$SOURCE_PNG"
 fi
