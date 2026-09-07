@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { resolveDroppedFilePath } from '@/lib/droppedPath';
 import { FileIcon, InfoIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -21,48 +22,12 @@ export function FsvInfo() {
         return;
       }
 
-      const view = new DataView(buf.buffer);
-      let manifest;
-      let dataSize;
-      let manifestSize;
-
-      // Try format 1: manifest at beginning (header: 8 bytes with sizes + manifest)
-      const firstU32 = view.getUint32(0, true);
-      const secondU32 = view.getUint32(8, true);
-      
-      if (buf[12] === 0x7b && secondU32 > 0 && secondU32 < buf.length) {
-        // Format 1: [dataSize:u32][padding:4][manifestSize:u32][manifest JSON][video data]
-        manifestSize = secondU32;
-        const manifestBuf = buf.subarray(12, 12 + manifestSize);
-        const manifestText = new TextDecoder().decode(manifestBuf);
-        try {
-          manifest = JSON.parse(manifestText);
-          dataSize = buf.length - 12 - manifestSize;
-        } catch (parseErr) {
-          setError(`Failed to parse manifest JSON (format 1). First 100 chars: ${manifestText.slice(0, 100)}`);
-          return;
-        }
-      } else {
-        // Format 2: manifest at end (footer: last 4 bytes = offset)
-        const manifestOffset = view.getUint32(buf.length - 4, true);
-
-        if (manifestOffset >= buf.length - 4 || manifestOffset < 0) {
-          setError(`Invalid manifest offset: ${manifestOffset} (file size: ${buf.length} bytes). This file may not be a valid .fsv or may be corrupted.`);
-          return;
-        }
-
-        const manifestBuf = buf.subarray(manifestOffset, buf.length - 4);
-        const manifestText = new TextDecoder().decode(manifestBuf);
-        
-        try {
-          manifest = JSON.parse(manifestText);
-          dataSize = manifestOffset;
-          manifestSize = manifestBuf.length;
-        } catch (parseErr) {
-          setError(`Failed to parse manifest JSON (format 2). First 100 chars: ${manifestText.slice(0, 100)}`);
-          return;
-        }
+      const parsed = parseFsvBuffer(buf);
+      if (!parsed.ok) {
+        setError(parsed.error);
+        return;
       }
+      const { manifest, dataSize, manifestSize, hasAlphaTrack } = parsed;
 
       const stats = await window.electronAPI.getFileStat(filePath);
 
@@ -76,7 +41,7 @@ export function FsvInfo() {
         fps: manifest.fps,
         frames: manifest.length || manifest.frames?.length || 0,
         duration: manifest.duration || 0,
-        hasAlpha: !!manifest.alphaConfig,
+        hasAlpha: hasAlphaTrack || !!manifest.alphaConfig,
         alphaCodec: manifest.alphaConfig?.codec,
         dataSize,
         manifestSize,
@@ -91,22 +56,12 @@ export function FsvInfo() {
     setDragging(false);
     
     // Try to get file from dataTransfer.files (Electron drag & drop)
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      const path = window.electronAPI.getPathForFile(file);
-      if (!path.toLowerCase().endsWith('.fsv')) {
-        setError('Only .fsv files are supported');
-        return;
-      }
-      setFile(path);
-      readFsv(path);
+    const file = e.dataTransfer.files?.[0];
+    const path = resolveDroppedFilePath(e, file);
+    if (!path) {
+      setError('Could not resolve the file path. Drop the .fsv from Finder.');
       return;
     }
-    
-    // Fallback: try text/plain (for compatibility)
-    const path = e.dataTransfer.getData('text/plain');
-    if (!path) return;
     if (!path.toLowerCase().endsWith('.fsv')) {
       setError('Only .fsv files are supported');
       return;
@@ -196,6 +151,63 @@ export function FsvInfo() {
       )}
     </div>
   );
+}
+
+/** @plutotcool/fsv layout — see Demuxer.mjs extractManifest */
+function parseFsvBuffer(buf) {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+
+  function parseTrack(trackStart, trackEnd) {
+    if (trackStart + 8 > trackEnd) {
+      return { ok: false, error: 'File too small for FSV track header' };
+    }
+    const manifestSize = view.getUint32(trackStart + 4, true);
+    const manifestStart = trackStart + 8;
+    const manifestEnd = manifestStart + manifestSize;
+
+    if (manifestSize <= 0 || manifestEnd > trackEnd) {
+      return { ok: false, error: `Invalid manifest size: ${manifestSize} (track bytes: ${trackEnd - trackStart})` };
+    }
+    if (buf[manifestStart] !== 0x7b) {
+      return { ok: false, error: 'Manifest does not start with JSON ({)' };
+    }
+
+    const manifestText = new TextDecoder().decode(buf.subarray(manifestStart, manifestEnd));
+    try {
+      const manifest = JSON.parse(manifestText);
+      const dataSize = trackEnd - manifestEnd;
+      return { ok: true, manifest, manifestSize, dataSize, hasAlphaTrack: false };
+    } catch {
+      return { ok: false, error: `Failed to parse manifest JSON. First 100 chars: ${manifestText.slice(0, 100)}` };
+    }
+  }
+
+  const alphaOffset = view.getUint32(0, true);
+  const colorStart = alphaOffset ? 4 : 0;
+  const colorEnd = alphaOffset || buf.length;
+  const color = parseTrack(colorStart, colorEnd);
+  if (color.ok) return { ...color, hasAlphaTrack: alphaOffset > 0 };
+
+  // Legacy .af-style: [video data][manifest][footer: u32 dataEnd]
+  const dataEnd = view.getUint32(buf.length - 4, true);
+  if (dataEnd > 0 && dataEnd < buf.length - 4 && buf[dataEnd] === 0x7b) {
+    const manifestBuf = buf.subarray(dataEnd, buf.length - 4);
+    const manifestText = new TextDecoder().decode(manifestBuf);
+    try {
+      const manifest = JSON.parse(manifestText);
+      return {
+        ok: true,
+        manifest,
+        manifestSize: manifestBuf.length,
+        dataSize: dataEnd,
+        hasAlphaTrack: false,
+      };
+    } catch {
+      return { ok: false, error: `Failed to parse legacy manifest JSON. First 100 chars: ${manifestText.slice(0, 100)}` };
+    }
+  }
+
+  return { ok: false, error: color.error || 'This file may not be a valid .fsv or may be corrupted.' };
 }
 
 function InfoRow({ label, value }) {
