@@ -8,6 +8,19 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { FolderOpen } from 'lucide-react';
 
+/** `hint` may be a single string or an array of lines */
+function renderHint(hint, className = '') {
+  if (!hint) return null;
+  const lines = Array.isArray(hint) ? hint : [hint];
+  return (
+    <div className={cn('space-y-0.5', className)}>
+      {lines.map((line, i) => (
+        <p key={i} className="text-[10px] leading-snug text-muted-foreground/60">{line}</p>
+      ))}
+    </div>
+  );
+}
+
 function renderControl(param, currentValue, onChange, meta, glyphs) {
   if (param.type === 'slider') {
     return (
@@ -56,9 +69,15 @@ function renderControl(param, currentValue, onChange, meta, glyphs) {
 
   if (param.type === 'preset-or-custom') {
     const limitValue = param.limitBy && meta ? meta[param.limitBy] : null;
+    const presetCount = param.presets?.length ?? 0;
+    const presetCols =
+      presetCount === 3 ? 'grid-cols-3'
+      : presetCount === 4 ? 'grid-cols-4'
+      : presetCount >= 5 ? 'grid-cols-3'
+      : 'grid-cols-2';
     return (
       <div className="space-y-1">
-        <div className="grid grid-cols-2 gap-1">
+        <div className={cn('grid gap-1', presetCols)}>
           {param.presets?.map((preset) => {
             const isActive = currentValue === String(preset);
             const isAboveLimit = limitValue != null && preset > limitValue;
@@ -187,7 +206,8 @@ export function ParamsPanel({ params = [], values, onChange, meta, glyphs }) {
           const colCount = param.cols ?? param.params?.length ?? 3;
           const hasStepLabels = param.params?.some((c) => c.type === 'slider' && c.stepLabels?.length);
           return (
-            <div key={param.name} className={`grid grid-cols-${colCount} gap-3 items-end`}>
+            <div key={param.name} className="space-y-1.5">
+            <div className={`grid grid-cols-${colCount} gap-3 items-end`}>
               {param.params?.map((child) => {
                 const childValue = String(values[child.name] ?? child.default ?? '');
                 const needsSpacer = hasStepLabels && child.type === 'slider' && !child.stepLabels?.length;
@@ -201,9 +221,12 @@ export function ParamsPanel({ params = [], values, onChange, meta, glyphs }) {
                     </div>
                     {needsSpacer && <div className="h-9" />}
                     {renderControl(child, childValue, onChange, meta, glyphs)}
+                    {renderHint(child.hint)}
                   </div>
                 );
               })}
+            </div>
+            {renderHint(param.hint, 'px-0.5')}
             </div>
           );
         }
@@ -268,6 +291,7 @@ export function ParamsPanel({ params = [], values, onChange, meta, glyphs }) {
               )}
             </div>
             {renderControl(param, currentValue, onChange, meta, glyphs)}
+            {renderHint(param.hint)}
           </div>
         );
       })}

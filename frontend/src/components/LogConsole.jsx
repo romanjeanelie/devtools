@@ -1,8 +1,46 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trash2, Maximize2 } from 'lucide-react';
+import { Trash2, Maximize2, Copy, Check } from 'lucide-react';
+
+/** Same text the console shows, as one plain string */
+function logsToText(logs) {
+  return logs.map((entry) => {
+    if (entry.type === 'start') return `▶  Running: ${entry.script}`;
+    if (entry.type === 'done')  return entry.code === 0 ? '✓  Process exited successfully' : `✗  Process exited with code ${entry.code}`;
+    if (entry.type === 'error') return `⚠  Error: ${entry.message}`;
+    return entry.data ?? '';
+  }).join('');
+}
+
+export function CopyLogsButton({ logs, className = '' }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(logsToText(logs));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard can be blocked; leave the icon untouched so it does not lie
+    }
+  }
+
+  return (
+    <Button
+      variant="ghost" size="icon"
+      className={cn('h-6 w-6 text-muted-foreground hover:text-foreground disabled:opacity-30', className)}
+      onClick={handleCopy}
+      disabled={logs.length === 0}
+      title={copied ? 'Copied' : 'Copy whole console'}
+    >
+      {copied
+        ? <Check className="h-3.5 w-3.5 text-emerald-400" />
+        : <Copy className="h-3.5 w-3.5" />}
+    </Button>
+  );
+}
 
 export function LogOutput({ logs }) {
   const bottomRef = useRef(null);
@@ -65,6 +103,7 @@ export function LogConsole({ logs, running, onClear, onExpand }) {
           )}
         </div>
         <div className="flex items-center gap-1">
+          <CopyLogsButton logs={logs} />
           <Button
             variant="ghost" size="icon"
             className="h-6 w-6 text-muted-foreground hover:text-foreground"

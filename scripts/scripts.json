@@ -61,6 +61,43 @@
     ]
   },
   {
+    "name": "Image Sequence → Video",
+    "path": "./scripts/image_seq_to_video.sh",
+    "description": "Image sequence folder → MP4 + poster WebP (1st frame, max width, aspect ratio preserved)",
+    "inputType": "folder",
+    "params": [
+      { "name": "outputDir", "label": "Output folder", "type": "folder-picker", "default": "", "placeholder": "Same as input folder" },
+      {
+        "name": "_row1",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { "name": "fps", "label": "FPS", "type": "preset-or-custom", "default": 25, "presets": [24, 25, 30, 60], "min": 1, "max": 240, "summary": true, "suffix": "fps" },
+          {
+            "name": "crf",
+            "label": "Quality (CRF)",
+            "type": "slider",
+            "default": 20,
+            "min": 0,
+            "max": 51,
+            "summary": true,
+            "steps": [0, 18, 28, 51],
+            "stepLabels": ["Lossless", "Visually lossless", "Medium", "Worst"]
+          }
+        ]
+      },
+      {
+        "name": "_row2",
+        "type": "row-group",
+        "cols": 2,
+        "params": [
+          { "name": "maxWidth", "label": "Max width", "type": "preset-or-custom", "default": 1920, "presets": [1280, 1920, 2560], "min": 320, "max": 7680, "summary": true, "suffix": "px" },
+          { "name": "preset", "label": "Encoder preset", "type": "button-group", "default": "slow", "options": ["veryfast", "medium", "slow"], "summary": true }
+        ]
+      }
+    ]
+  },
+  {
     "name": "Image Sequence → Web",
     "path": "./scripts/image_seq_opti.sh",
     "description": "Resize and convert an image sequence folder → .tar (desktop + mobile)",
@@ -165,17 +202,24 @@
   {
     "name": "Video → Web",
     "path": "./scripts/video_web.sh",
-    "description": "Compress video for web (H.264/VP9) + poster frame WebP",
+    "description": "Compress video for web (H.264/VP9) or transparent video (HEVC + VP9 alpha) + poster frame WebP",
     "params": [
+      { "name": "mode", "label": "Mode", "type": "button-group", "default": "standard", "options": ["standard", "transparent"], "summary": true },
       {
         "name": "_row1",
         "type": "row-group",
+        "hint": [
+          "mp4  → Safari + iOS",
+          "webm → Chrome + Firefox + Edge",
+          "both → every browser · required in transparent mode, neither file covers all engines alone"
+        ],
         "params": [
           { "name": "format",   "label": "Format",    "type": "button-group",     "default": "mp4",  "options": ["mp4", "webm", "both"], "summary": true },
-          { "name": "maxWidth", "label": "Max Width", "type": "preset-or-custom", "default": 1920,   "presets": [1280, 1920, 2560],      "min": 320, "max": 7680, "summary": true, "suffix": "px", "limitBy": "width" },
+          { "name": "maxWidth", "label": "Max Width", "type": "preset-or-custom", "default": 1920,   "presets": [750, 1280, 1920, 2560], "min": 320, "max": 7680, "summary": true, "suffix": "px", "limitBy": "width" },
           { "name": "quality",  "label": "Quality",   "type": "slider",           "default": 75,     "min": 1, "max": 100, "summary": true }
         ]
       },
+      { "name": "alphaQuality", "label": "Alpha quality (HEVC layer)", "type": "slider", "default": 90, "min": 1, "max": 100, "summary": true, "showWhen": { "param": "mode", "value": "transparent" } },
       { "name": "stripAudio", "label": "Strip audio", "type": "toggle-group", "default": false, "params": [] }
     ]
   },

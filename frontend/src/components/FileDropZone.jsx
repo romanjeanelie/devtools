@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { resolveDroppedFilePath, isAbsolutePath } from '@/lib/droppedPath';
 import { cn } from '@/lib/utils';
 import { FolderOpen, Film, FileCode2, ClipboardPaste } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
 
 const BACKEND = 'http://localhost:3001';
 
@@ -14,8 +15,13 @@ function formatDuration(sec) {
 export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
   const [dragging, setDragging] = useState(false);
   const [pasting, setPasting] = useState(false);
+  const [pathError, setPathError] = useState('');
   const [svgPreview, setSvgPreview] = useState(null);
-  const [svgBg, setSvgBg] = useState('transparent');
+  const [previewBg, setPreviewBg] = useState('transparent');
+  const [framePreview, setFramePreview] = useState(null);
+  const [frameAlpha, setFrameAlpha] = useState(null);
+  const [frameError, setFrameError] = useState('');
+  const [frameLoading, setFrameLoading] = useState(false);
 
   const BACKGROUNDS = [
     { key: 'transparent', label: 'Transparent', style: { backgroundImage: 'repeating-conic-gradient(#444 0% 25%, #2a2a2a 0% 50%)', backgroundSize: '10px 10px' } },
@@ -29,24 +35,110 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
     if (!value) setSvgPreview(null);
   }, [value]);
 
-  const handleDrop = useCallback(async (e) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    const path =
-      window.electronAPI?.getPathForFile?.(file) ||
-      file.path ||
-      '';
-    onChange(path || file.name);
+  // Pull the first frame of a video input so transparency can be checked by eye
+  useEffect(() => {
+    setFrameAlpha(null);
+    setFrameError('');
+    const isFile = value && value.match(/\.[^/\\]+$/) && !value.toLowerCase().endsWith('.svg');
+    if (!isFile || !isAbsolutePath(value)) {
+      setFramePreview(null);
+      return;
+    }
 
-    if (file.name.toLowerCase().endsWith('.svg')) {
+    let cancelled = false;
+    let objectUrl = null;
+    setFrameLoading(true);
+    fetch(`${BACKEND}/frame?path=${encodeURIComponent(value)}&w=480`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Could not read a frame from this file');
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setFramePreview(objectUrl);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setFramePreview(null);
+        setFrameError(e.message);
+      })
+      .finally(() => { if (!cancelled) setFrameLoading(false); });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [value]);
+
+  // Count transparent pixels in the decoded frame — the honest answer to
+  // "does my source really have an alpha channel?"
+  function measureAlpha(e) {
+    const img = e.currentTarget;
+    try {
+      const w = Math.min(img.naturalWidth, 200);
+      const h = Math.max(1, Math.round(img.naturalHeight * (w / img.naturalWidth)));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h).data;
+      let clear = 0;
+      let partial = 0;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] === 0) clear++;
+        else if (data[i] < 250) partial++;
+      }
+      const total = data.length / 4;
+      setFrameAlpha({ clear: clear / total, partial: partial / total });
+    } catch {
+      setFrameAlpha(null);
+    }
+  }
+
+  const applyPath = useCallback(async (path, file) => {
+    if (!isAbsolutePath(path)) {
+      setPathError('Could not resolve the file path. Use Browse, or drop the file from Finder.');
+      return;
+    }
+    setPathError('');
+    onChange(path);
+
+    if (file?.name?.toLowerCase().endsWith('.svg')) {
       const text = await file.text();
       setSvgPreview(text);
+    } else if (path.toLowerCase().endsWith('.svg') && window.electronAPI?.readFile) {
+      try {
+        const buf = await window.electronAPI.readFile(path);
+        setSvgPreview(new TextDecoder().decode(buf));
+      } catch {
+        setSvgPreview(null);
+      }
     } else {
       setSvgPreview(null);
     }
   }, [onChange]);
+
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    const path = resolveDroppedFilePath(e, file);
+    if (!file && !path) return;
+    await applyPath(path, file);
+  }, [applyPath]);
+
+  async function handleBrowse() {
+    const path = await window.electronAPI?.openInputDialog?.({
+      directory: inputType === 'folder',
+    });
+    if (path) await applyPath(path);
+  }
 
   async function handlePaste() {
     try {
@@ -61,6 +153,7 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
       });
       const data = await res.json();
       if (data.path) {
+        setPathError('');
         onChange(data.path);
         setSvgPreview(trimmed);
       }
@@ -70,7 +163,7 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
 
   const isFolder = value && !value.match(/\.[^/\\]+$/);
   const isSvg = value && value.toLowerCase().endsWith('.svg');
-  const hasRealPath = value && (value.startsWith('/') || value.match(/^[A-Z]:\\/));
+  const hasRealPath = isAbsolutePath(value);
   const FileIcon = isSvg ? FileCode2 : Film;
   const placeholderText = inputType === 'folder'
     ? 'Drop an image sequence folder here'
@@ -116,13 +209,23 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
 
           {value && (
             <button
-              onClick={() => { onChange(''); setSvgPreview(null); }}
+              onClick={() => { onChange(''); setSvgPreview(null); setFramePreview(null); setFrameAlpha(null); setPathError(''); }}
               className="shrink-0 p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
             >
               <span className="text-[11px] leading-none">✕</span>
             </button>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={handleBrowse}
+          title="Browse…"
+          className="shrink-0 flex items-center gap-1.5 px-3 rounded-lg border border-border text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-accent/30 transition-colors"
+        >
+          <FolderOpen className="h-3.5 w-3.5" />
+          Browse
+        </button>
 
         {allowPaste && (
           <button
@@ -138,6 +241,10 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
         )}
       </div>
 
+      {pathError && (
+        <p className="text-[11px] text-destructive px-1">{pathError}</p>
+      )}
+
       {/* SVG preview */}
       {svgPreview && (
         <div className="rounded-lg border border-border overflow-hidden relative" style={{ minHeight: 80, maxHeight: 200 }}>
@@ -148,10 +255,10 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
                 key={bg.key}
                 type="button"
                 title={bg.label}
-                onClick={() => setSvgBg(bg.key)}
+                onClick={() => setPreviewBg(bg.key)}
                 className={cn(
                   'w-4 h-4 rounded-sm border transition-all',
-                  svgBg === bg.key ? 'border-primary scale-110' : 'border-white/20 hover:border-white/50'
+                  previewBg === bg.key ? 'border-primary scale-110' : 'border-white/20 hover:border-white/50'
                 )}
                 style={bg.style}
               />
@@ -160,9 +267,66 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
           {/* SVG render */}
           <div
             className="w-full flex items-center justify-center p-3 [&>svg]:max-w-full [&>svg]:max-h-[176px] [&>svg]:h-auto"
-            style={BACKGROUNDS.find(b => b.key === svgBg)?.style}
+            style={BACKGROUNDS.find(b => b.key === previewBg)?.style}
             dangerouslySetInnerHTML={{ __html: svgPreview }}
           />
+        </div>
+      )}
+
+      {/* First-frame preview — check the source really is transparent */}
+      {(framePreview || frameLoading || frameError) && (
+        <div className="rounded-lg border border-border overflow-hidden">
+          {frameLoading && (
+            <p className="text-[11px] text-muted-foreground px-3 py-2">Reading first frame…</p>
+          )}
+          {frameError && !frameLoading && (
+            <p className="text-[11px] text-muted-foreground px-3 py-2">{frameError}</p>
+          )}
+          {framePreview && !frameLoading && (
+            <>
+              <div className="relative">
+                <div className="absolute top-2 right-2 z-10 flex gap-1">
+                  {BACKGROUNDS.map((bg) => (
+                    <button
+                      key={bg.key}
+                      type="button"
+                      title={bg.label}
+                      onClick={() => setPreviewBg(bg.key)}
+                      className={cn(
+                        'w-4 h-4 rounded-sm border transition-all',
+                        previewBg === bg.key ? 'border-primary scale-110' : 'border-white/20 hover:border-white/50'
+                      )}
+                      style={bg.style}
+                    />
+                  ))}
+                </div>
+                <div
+                  className="w-full flex items-center justify-center p-3"
+                  style={BACKGROUNDS.find((b) => b.key === previewBg)?.style}
+                >
+                  <img
+                    src={framePreview}
+                    alt="First frame"
+                    onLoad={measureAlpha}
+                    className="max-h-[200px] w-auto object-contain"
+                  />
+                </div>
+              </div>
+              {frameAlpha && (
+                <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-accent/10">
+                  <span className={cn(
+                    'h-1.5 w-1.5 rounded-full shrink-0',
+                    frameAlpha.clear > 0.005 ? 'bg-primary' : 'bg-muted-foreground/40'
+                  )} />
+                  <span className="text-[11px] text-muted-foreground">
+                    {frameAlpha.clear > 0.005
+                      ? `Transparent background · ${Math.round(frameAlpha.clear * 100)}% of the frame is fully clear`
+                      : 'No transparency in this frame — the output will be opaque'}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -176,6 +340,9 @@ export function FileDropZone({ value, onChange, meta, allowPaste, inputType }) {
           )}
           {meta.codec && (
             <span className="text-[11px] font-mono text-muted-foreground uppercase">{meta.codec}</span>
+          )}
+          {meta.pixFmt && (
+            <span className="text-[11px] font-mono text-muted-foreground">{meta.pixFmt}</span>
           )}
           {meta.duration > 0 && (
             <span className="text-[11px] font-mono text-muted-foreground">{formatDuration(meta.duration)}</span>

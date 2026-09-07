@@ -1,9 +1,10 @@
 import { FileDropZone } from '@/components/FileDropZone';
 import { FsvInfo } from '@/components/FsvInfo';
-import { LogConsole, LogOutput } from '@/components/LogConsole';
+import { LogConsole, LogOutput, CopyLogsButton } from '@/components/LogConsole';
 import { ParamsPanel } from '@/components/ParamsPanel';
 import { ScriptEditor } from '@/components/ScriptEditor';
 import { ScriptList } from '@/components/ScriptList';
+import { isAbsolutePath } from '@/lib/droppedPath';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,6 +20,8 @@ function getParamSummary(paramList, values) {
   const items = [];
   function collect(params) {
     params?.forEach((p) => {
+      // A param hidden by showWhen must not show up in the summary either
+      if (p.showWhen && String(values[p.showWhen.param] ?? '') !== String(p.showWhen.value)) return;
       if (p.summary) {
         const val = values[p.name] ?? p.default ?? '';
         items.push(`${val}${p.suffix || ''}`);
@@ -221,7 +224,7 @@ export default function App() {
     await fetch(`${BACKEND}/stop`, { method: 'POST' });
   }
 
-  const canRun = !!selected && !!inputPath && !running;
+  const canRun = !!selected && isAbsolutePath(inputPath) && !running;
 
   // ── Layout ─────────────────────────────────────────────────────────────────
   return (
@@ -439,6 +442,7 @@ export default function App() {
               {running && (
                 <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
               )}
+              <CopyLogsButton logs={logs} className="ml-auto mr-8" />
             </div>
           </DialogHeader>
           <LogOutput logs={logs} />

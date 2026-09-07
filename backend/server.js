@@ -26,9 +26,9 @@ function sanitizeKey(key) {
   return key.replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
-/** Strip shell-dangerous characters from param values */
+/** Strip control chars that break argv parsing. Keep () {} intact — common in filenames (e.g. "file (1).png"). Safe with spawn (no shell). */
 function sanitizeValue(val) {
-  return String(val).replace(/[;&|`$(){}!\n\r]/g, '');
+  return String(val).replace(/[\n\r\0]/g, '');
 }
 
 /** Ensure a resolved path stays within an allowed root */
@@ -279,12 +279,66 @@ app.get('/probe', (req, res) => {
         codec:    video.codec_name,
         width:    video.width,
         height:   video.height,
+        pixFmt:   video.pix_fmt,
+        hasAlpha: pixFmtHasAlpha(video.pix_fmt),
         format:   data.format?.format_long_name,
         duration: parseFloat(data.format?.duration || 0),
       });
     } catch {
       res.status(500).json({ error: 'Failed to parse ffprobe output' });
     }
+  });
+});
+
+/** Pixel formats that carry an alpha channel. vp8/vp9/hevc hide theirs in a
+ *  side stream or an auxiliary layer, so ffprobe reports them as opaque. */
+function pixFmtHasAlpha(pixFmt) {
+  return /^(yuva|rgba|bgra|argb|abgr|gbrap|ya8|ya16|pal8)/.test(pixFmt || '');
+}
+
+/** WebM alpha only comes out of the libvpx decoders */
+function alphaDecoderFor(codec) {
+  if (codec === 'vp9') return ['-c:v', 'libvpx-vp9'];
+  if (codec === 'vp8') return ['-c:v', 'libvpx'];
+  return [];
+}
+
+// GET /frame — first frame as a PNG, alpha preserved (input transparency check)
+app.get('/frame', (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) return res.status(400).json({ error: 'Missing path' });
+  if (!existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+  const width = Math.min(Math.max(parseInt(req.query.w, 10) || 480, 64), 1024);
+
+  const probe = spawn('ffprobe', [
+    '-v', 'error', '-select_streams', 'v:0',
+    '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', filePath,
+  ]);
+  let codec = '';
+  probe.stdout.on('data', (d) => codec += d);
+  probe.on('error', () => res.status(500).json({ error: 'ffprobe unavailable' }));
+  probe.on('close', () => {
+    const proc = spawn('ffmpeg', [
+      '-v', 'error',
+      ...alphaDecoderFor(codec.trim()),
+      '-i', filePath,
+      '-frames:v', '1',
+      '-vf', `scale=${width}:-1:flags=lanczos,format=rgba`,
+      '-c:v', 'png', '-f', 'image2pipe', '-',
+    ]);
+
+    const chunks = [];
+    let err = '';
+    proc.stdout.on('data', (d) => chunks.push(d));
+    proc.stderr.on('data', (d) => err += d);
+    proc.on('error', () => res.status(500).json({ error: 'ffmpeg unavailable' }));
+    proc.on('close', (code) => {
+      if (code !== 0 || chunks.length === 0) {
+        return res.status(500).json({ error: err.trim() || 'Frame extraction failed' });
+      }
+      res.type('png').send(Buffer.concat(chunks));
+    });
   });
 });
 
