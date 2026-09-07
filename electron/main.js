@@ -10,6 +10,7 @@ const BACKEND_PORT = 3001;
 
 let win = null;
 let backendProc = null;
+let isCreatingWindow = false;
 
 // ── Start Express backend ─────────────────────────────────────────────────────
 function startBackend() {
@@ -44,6 +45,8 @@ function waitForPort(port, timeout = 15_000) {
 
 // ── Create window ─────────────────────────────────────────────────────────────
 async function createWindow() {
+  if (isCreatingWindow) return;
+  isCreatingWindow = true;
   win = new BrowserWindow({
     width:  1280,
     height: 820,
@@ -65,13 +68,14 @@ async function createWindow() {
   });
 
   if (DEV) {
-    // Wait for Vite dev server too
     await waitForPort(5173).catch(() => {});
     win.loadURL(FRONTEND_URL);
     win.webContents.openDevTools({ mode: 'bottom' });
   } else {
     win.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
   }
+
+  isCreatingWindow = false;
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
@@ -103,6 +107,15 @@ app.on('before-quit', () => {
 ipcMain.handle('open-folder-dialog', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     properties: ['openDirectory', 'createDirectory'],
+  });
+  return canceled ? null : filePaths[0];
+});
+
+ipcMain.handle('open-input-dialog', async (_event, opts = {}) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    properties: opts.directory
+      ? ['openDirectory', 'createDirectory']
+      : ['openFile'],
   });
   return canceled ? null : filePaths[0];
 });
