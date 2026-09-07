@@ -10,7 +10,49 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:electron": "wait-on http://localhost:5173 && NODE_ENV=development electron .",
     "build": "npm run build --prefix frontend",
-    "start": "electron ."
+    "start": "electron .",
+    "icon": "node scripts/create-icon.mjs",
+    "pack": "npm run build && electron-builder --dir",
+    "pack:fast": "electron-builder --dir",
+    "dist": "npm run build && electron-builder --mac dmg"
+  },
+  "build": {
+    "appId": "com.roman.scripts-gui",
+    "productName": "Scripts GUI",
+    "asar": false,
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "**/*",
+      "!.git/**",
+      "!.gitignore",
+      "!dist-electron/**",
+      "!frontend/src/**",
+      "!frontend/node_modules/**",
+      "!frontend/public/**",
+      "!frontend/frontend/**",
+      "!frontend/vite.config.js",
+      "!frontend/tailwind.config.js",
+      "!frontend/postcss.config.js",
+      "!frontend/index.html",
+      "!node_modules/electron/**",
+      "!node_modules/electron-builder/**",
+      "!node_modules/concurrently/**",
+      "!node_modules/wait-on/**",
+      "!node_modules/.bin/**",
+      "!**/node_modules/*/{test,__tests__,tests,example,examples}/**",
+      "!**/node_modules/**/*.map",
+      "!**/.DS_Store",
+      "!scripts/create-icon.mjs"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "target": [
+        { "target": "dir", "arch": ["arm64"] }
+      ]
+    }
   },
   "dependencies": {
     "@plutotcool/fsv": "^0.3.9",
@@ -20,6 +62,7 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
     "wait-on": "^9.0.4"
   }
 }
